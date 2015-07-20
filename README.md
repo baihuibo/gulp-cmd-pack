@@ -96,9 +96,9 @@ define('b.js' , [] ,function(require , exports , module){
     seajs.use('a');
 ```
 
-### Option 参数说明
+## Option 参数说明
 1. ·option.alias·  模块别名
-    和seajs.config({alias : {}}) 的作用一样，使工具可以根据别名找到文件
+    和 `seajs.config({alias : {}})` 的作用一样，使工具可以根据别名找到文件
 2. ·option.ignore·  忽略模块
     忽略打包的文件，这样的模块不会被打包
 3. ·option.encoding·  编码
