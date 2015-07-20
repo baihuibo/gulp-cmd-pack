@@ -105,39 +105,39 @@ define('b.js' , [] ,function(require , exports , module){
     文件编码，默认 `UTF-8`
 4. ·option.tmpExtNames·  模板后缀名
     模板文件支持，默认值为 `['.ejs']` ，吧字符串模板转换为标准模块：
-
-template path/tmp/test.ejs
-```
-    <div><%= data.name %></div>
-```
-
-module path/module/test.js
-```js
-    var testStr = require('../tmp/test.ejs');
-    var str = _.template(testStr , {data : {name : 'aa'}});
-    //str = '<div>aa</div>'
-```
-
-gulp
-```js
-    var cmdPack = require('gulp-cmd-wrap');
-    gulp.src( 'path/module/test.js' )
-        .pipe( cmdPack({
-            mainId : 'test',
-            base : 'path/module'
-        }))
-        .pipe(gulp.dest('path/dist/'));
-```
+    
+    模块 path/module/test.js
+    ```js
+        var testStr = require('../tmp/test.ejs');
+        var str = _.template(testStr , {data : {name : 'aa'}});
+        //str = '<div>aa</div>'
+    ```
+    模板文件 path/tmp/test.ejs
+    ```
+        <div><%= data.name %></div>
+    ```
+    
+    gulp
+    ```js
+        var cmdPack = require('gulp-cmd-wrap');
+        gulp.src( 'path/module/test.js' )
+            .pipe( cmdPack({
+                mainId : 'test',
+                base : 'path/module',
+                tmpExtNames : ['.ejs'] //提供模板文件的后缀名用来区分模板
+            }))
+            .pipe(gulp.dest('path/dist/'));
+    ```
          
-结果 path/dist/test
-```js
-define('test' , ['../tmp/test.ejs'] , function(require , exports , module){
-    var testStr = require('../tmp/test.ejs');
-    var str = _.template(testStr , {name : 'aa'});
-    //str = '<div>aa</div>'
-});
-
-define('../tmp/test.ejs' , [] , function(require , exports , module){
-    return '<div><%= data.name %></div>'
-});
-```
+    结果 path/dist/test.js
+    ```js
+    define('test' , ['../tmp/test.ejs'] , function(require , exports , module){
+        var testStr = require('../tmp/test.ejs');
+        var str = _.template(testStr , {name : 'aa'});
+        //str = '<div>aa</div>'
+    });
+    
+    define('../tmp/test.ejs' , [] , function(require , exports , module){
+        return '<div><%= data.name %></div>'
+    });
+    ```
