@@ -1,0 +1,32 @@
+{
+  "name": "gulp-cmd-pack",
+  "version": "1.0.0",
+  "description": "seajs的cmd模块合并打包工具",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/baihuibo/gulp-cmd-pack.git"
+  },
+  "keywords": [
+    "gulpplugin",
+    "seajs",
+    "cmd",
+    "concat",
+    "transform"
+  ],
+  "author": "baihuibo@hotmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/baihuibo/gulp-cmd-pack/issues"
+  },
+  "homepage": "https://github.com/baihuibo/gulp-cmd-pack#readme",
+  "dependencies": {
+    "gulp-util": "^3.0.3",
+    "through2": "^0.6.3",
+    "promise": "^6.1.0",
+    "underscore": "^1.8.3"
+  }
+}
