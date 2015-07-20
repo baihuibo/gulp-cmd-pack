@@ -55,11 +55,10 @@ Module `path/module/a.js` :
 Module `path/module/b.js` :
 
 ```js
-
+    //common module
     module.exports = 'b';
     
-    //or
-    
+    //or seajs module
     define(function(require){
         return 'b';
     });
@@ -88,3 +87,22 @@ define('b.js' , [] ,function(require , exports , module){
     return 'b';
 });
 ```
+
+页面上使用
+```js
+    seajs.config({
+        base : 'path/dist/'
+    });
+    seajs.use('a');
+```
+
+### Option 参数说明
+    ·option.alias·  模块别名
+        和seajs.config({alias : {}}) 的作用一样，使工具可以根据别名找到文件
+    ·option.ignore·  忽略模块
+        忽略打包的文件，这样的模块不会被打包
+    ·option.encoding·  编码
+        文件编码，默认 `UTF-8`
+    ·option.tmpExtNames·  模板后缀名
+        模板文件支持，默认值为 ['.ejs'] ，吧字符串模板转换为标准模块：
+         
