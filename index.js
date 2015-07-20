@@ -16,6 +16,7 @@ module.exports = function (option) {
     option.alias = option.alias || {};
     option.ignore = option.ignore || [];
     option.encoding = option.encoding || 'UTF-8';
+    option.tmpExtNames = option.tmpExtNames || ['.ejs'];
     option.cache = {};
 
     if (option.base) {
@@ -149,7 +150,7 @@ function readDeps(option, parentDeps) {
                 if (deps.length) {
                     childDeps = childDeps.concat(deps);
                 }
-            } else {//插件支持
+            } else if(option.tmpExtNames.indexOf(mod.ext) > -1){//插件支持
                 try {
                     contents = fs.readFileSync(mod.filePath, option.encoding);
                 } catch (_) {
