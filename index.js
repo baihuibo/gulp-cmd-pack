@@ -8,6 +8,8 @@ var fs = require('fs');
 var gutil = require('gulp-util');
 var _ = require('underscore');
 
+var PLUGIN_NAME = 'gulp-cmd-wrap';
+
 module.exports = function (option) {
 
     option = option || {};
@@ -34,7 +36,7 @@ module.exports = function (option) {
             option.content = file.contents.toString();
             parseContents(option, file).then(function () {
                 file.contents = new Buffer(comboContents(option));
-                gutil.log('gulp-cmd:', '✔ Module [' + option.mainId + '] combo success.');
+                gutil.log(PLUGIN_NAME + ':', '✔ Module [' + option.mainId + '] combo success.');
                 cb(null, file);
             });
             return;
@@ -150,7 +152,7 @@ function readDeps(option, parentDeps) {
                 if (deps.length) {
                     childDeps = childDeps.concat(deps);
                 }
-            } else if(option.tmpExtNames.indexOf(mod.ext) > -1){//插件支持
+            } else if (option.tmpExtNames.indexOf(mod.ext) > -1) {//插件支持
                 try {
                     contents = fs.readFileSync(mod.filePath, option.encoding);
                 } catch (_) {
@@ -180,7 +182,7 @@ function readDeps(option, parentDeps) {
         });
 }
 
-var CMD_REG = /define\(.*function\s*\(\s*require\s*(.*)?\)\s*\{/;
+var CMD_HEAD_REG = /define\(.*function\s*\(\s*require\s*(.*)?\)\s*\{/;
 function comboContents(option) {
     var content = '';
     option.mods.forEach(function (mod) {
@@ -189,13 +191,17 @@ function comboContents(option) {
         //替换模块内部id
         code = transform(option, mod, code);
 
-        if (!CMD_REG.test(code)) {
-            var deps = '[],';
-            if (mod.deps.length) {
-                deps = '["' + _.pluck(mod.deps, 'id').join('","') + '"],';
-            }
+        var deps = '[],';
+        if (mod.deps.length) {
+            deps = '["' + _.pluck(mod.deps, 'id').join('","') + '"],';
+        }
 
-            code = 'define("' + mod.id + '" , ' + deps + ' function(require , exports , module){\n' + code + '});';
+        var define = 'define("' + mod.id + '" , ' + deps + ' function(require , exports , module){\n';
+
+        if (!CMD_HEAD_REG.test(code)) {//标准cmd模块
+            code = define + code + '});';
+        } else {//seajs 模块
+            code = define + code.replace(CMD_HEAD_REG, '');
         }
 
         content += code + '\n';
