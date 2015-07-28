@@ -63,7 +63,7 @@ Module `path/module/b.js` :
     });
 ```
 
-gulp:
+Gulp:
 
 ```js
     var cmdPack = require('gulp-cmd-wrap');
