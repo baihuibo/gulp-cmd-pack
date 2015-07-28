@@ -21,11 +21,10 @@ gulp.task('cmd', function () {
             mainId: 'app', //初始化模块的id
             base: 'path/to/module/', //base路径
             alias: {
-                bootstrap: '../../bower_components/bootstrap/dist/js/bootstrap.min.js',
                 dialog: '../../bower_components/art-dialog/dist/dialog-plus-min.js',
                 customScrollBar: '../../bower_components/malihu-custom-scrollbar-plugin/jquery.mCustomScrollbar.min.js'
             },
-            ignore: ['bootstrap', 'dialog', 'customScrollBar'] //这里的模块将不会打包进去
+            ignore: ['bootstrap'] //这里的模块将不会打包进去
         }))
         .pipe(uglify({ //压缩文件，这一步是可选的
             mangle: {
@@ -41,11 +40,11 @@ gulp.task('cmd', function () {
 Module `path/module/a.js` :
 
 ```js
-    //common module 规范
+    //CommonJS 规范
     var b = require( './b' );
     module.exports =  'a' + ' ' + b;
     
-    //或者seajs的模块规范，require变量必须有，不能省略
+    //或者seajs的cmd模块规范，require关键字必须有，不能省略
     define(function(require , exports , module){
         var b = require( './b' );
         return  'a' + ' ' + b;
@@ -55,16 +54,16 @@ Module `path/module/a.js` :
 Module `path/module/b.js` :
 
 ```js
-    //common module
+    //CommonJS
     module.exports = 'b';
     
-    //or seajs module
+    //or seajs
     define(function(require){
         return 'b';
     });
 ```
 
-gulp code :
+gulp:
 
 ```js
     var cmdPack = require('gulp-cmd-wrap');
@@ -76,7 +75,7 @@ gulp code :
         .pipe(gulp.dest('path/dist/'));
 ```
 
-合并后 `path/dist/a.js` :
+Results `path/dist/a.js` :
 
 ```
 define('a',['b.js'],function(require , exports , module){
@@ -88,7 +87,7 @@ define('b.js' , [] ,function(require , exports , module){
 });
 ```
 
-页面上使用
+Use
 ```js
     seajs.config({
         base : 'path/dist/'
@@ -97,27 +96,67 @@ define('b.js' , [] ,function(require , exports , module){
 ```
 
 ## Option 参数说明
-1. ·option.alias·  模块别名
-    和 `seajs.config({alias : {}})` 的作用一样，使工具可以根据别名找到文件
-2. ·option.ignore·  忽略模块
-    忽略打包的文件，这样的模块不会被打包
-3. ·option.encoding·  编码
+1. `option.alias`  模块别名
+    作用和 `seajs.config({alias : {}})` 一样，使工具可以识别 `alias` 别名配置的路径
+    
+2. `option.ignore`  忽略模块列表
+    写在此数组内的模块不会被打包(但是会保留require引用)
+    
+    Module `path/module/a.js` :
+    ```js
+        var $ = require('jquery');
+        var b = require('./b');
+        $('button').text('hello button !! ' + b);
+    ```
+    
+    Module `path/module/b.js` : 
+    ```js
+        module.exports = 'b';
+    ```
+    
+    Gulp :
+    ```js
+        var cmdPack = require('gulp-cmd-wrap');
+        gulp.src( 'path/module/a.js' )
+            .pipe( cmdPack({
+                mainId : 'a',
+                base : 'path/module',
+                ignore : ['jquery']
+            }))
+            .pipe(gulp.dest('path/dist/'));
+    ```
+    
+    Results `path/dist/a.js` :
+    ```js
+    define('a' , ['./b.js'] , function(require , exports , module){
+       var $ = require('jquery');
+       var b = require('./b.js');
+       $('button').text('hello button !! ' + b);
+    });
+    
+    define('./b.js' , [] , function(require , exports , module){
+        module.exports = 'b';
+    });
+    ```
+    
+3. `option.encoding`  编码
     文件编码，默认 `UTF-8`
-4. ·option.tmpExtNames·  模板后缀名
+    
+4. `option.tmpExtNames`  模板后缀名
     模板文件支持，默认值为 `['.ejs']` ，吧字符串模板转换为标准模块：
     
-    模块 path/module/test.js
+    Module `path/module/test.js` :
     ```js
         var testStr = require('../tmp/test.ejs');
         var str = _.template(testStr , {data : {name : 'aa'}});
         //str = '<div>aa</div>'
     ```
-    模板文件 path/tmp/test.ejs
+    Template `path/tmp/test.ejs` : 
     ```
         <div><%= data.name %></div>
     ```
     
-    gulp
+    Gulp :
     ```js
         var cmdPack = require('gulp-cmd-wrap');
         gulp.src( 'path/module/test.js' )
@@ -129,7 +168,7 @@ define('b.js' , [] ,function(require , exports , module){
             .pipe(gulp.dest('path/dist/'));
     ```
          
-    结果 path/dist/test.js
+    Results `path/dist/test.js` :
     ```js
     define('test' , ['../tmp/test.ejs'] , function(require , exports , module){
         var testStr = require('../tmp/test.ejs');
