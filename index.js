@@ -31,6 +31,11 @@ module.exports = function (option) {
             return cb();
         }
 
+        if (!option.base || !option.mainId) {
+            var opts = !option.base ? '`option.base`' : '`option.mainId`';
+            gutil.log(gutil.colors.red(PLUGIN_NAME + ' error: ' + opts + ' is required!'));
+            return cb(null, file);
+        }
 
         if (file.isBuffer()) {
             option.content = file.contents.toString();
@@ -65,8 +70,8 @@ function getId(path, option) {
     return path.replace(option.base, '').replace(sepReg, '/').replace('/', '_');
 }
 
-//解析模块base
-function addBase(id, option, absoluteBase) {
+//解析模块
+function parseMod(id, option, absoluteBase) {
     var ret = getPath(id, option, absoluteBase);
 
     var isAlias = option.alias[id];
@@ -91,13 +96,11 @@ function parseDependencies(option, code, absoluteBase, mod) {
     var ret = [];
     code.replace(SLASH_RE, "")
         .replace(REQUIRE_RE, function (m, m1, m2) {
-            if (m2) {
-                ret.push(m2)
-            }
+            m2 && ret.push(m2)
         });
 
     var deps = ret.map(function (modName) {
-        return addBase(modName, option, absoluteBase);
+        return parseMod(modName, option, absoluteBase);
     });
 
     mod.deps = deps;
@@ -105,6 +108,13 @@ function parseDependencies(option, code, absoluteBase, mod) {
     option.mods.push(mod);
 
     return deps;
+}
+
+//模板模块处理
+function parseTemplate(option, code, mod) {
+    mod.code = 'module.exports = \'' + jsEscape(code) + '\';';
+    mod.deps = [];
+    option.mods.push(mod);
 }
 
 
@@ -134,11 +144,12 @@ function readDeps(option, parentDeps) {
                 return resolve();
             }
 
+            if (option.cache[mod.filePath]) {
+                return resolve();
+            }
+
             var contents, deps;
-            if (mod.ext == '.js') {
-                if (option.cache[mod.filePath]) {
-                    return resolve();
-                }
+            if (mod.ext === '.js' || option.tmpExtNames.indexOf(mod.ext) > -1) {
                 try {
                     contents = fs.readFileSync(mod.filePath, option.encoding);
                 } catch (_) {
@@ -147,22 +158,15 @@ function readDeps(option, parentDeps) {
                 }
 
                 option.cache[mod.filePath] = true;
+            }
 
+            if (mod.ext == '.js') {
                 deps = parseDependencies(option, contents, mod.dir, mod);
                 if (deps.length) {
                     childDeps = childDeps.concat(deps);
                 }
             } else if (option.tmpExtNames.indexOf(mod.ext) > -1) {//插件支持
-                try {
-                    contents = fs.readFileSync(mod.filePath, option.encoding);
-                } catch (_) {
-                    reject("File [" + mod.filePath + "] not found.");
-                    return;
-                }
-
-                mod.code = 'module.exports = \'' + jsEscape(contents) + '\';';
-                mod.deps = [];
-                option.mods.push(mod);
+                parseTemplate(option, contents, mod);
             }
 
             resolve();
@@ -199,7 +203,7 @@ function comboContents(option) {
         var define = 'define("' + mod.id + '" , ' + deps + ' function(require , exports , module){\n';
 
         if (!CMD_HEAD_REG.test(code)) {//标准cmd模块
-            code = define + code + '});';
+            code = define + code + '\n});';
         } else {//seajs 模块
             code = define + code.replace(CMD_HEAD_REG, '');
         }
