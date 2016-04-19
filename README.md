@@ -44,7 +44,7 @@ Module `path/module/a.js` :
     var b = require( './b' );
     module.exports =  'a' + ' ' + b;
     
-    //或者seajs的cmd模块规范，require关键字必须有，不能省略
+    //或者cmd模块规范，require关键字必须有，不能省略
     define(function(require , exports , module){
         var b = require( './b' );
         return  'a' + ' ' + b;
@@ -57,7 +57,7 @@ Module `path/module/b.js` :
     //CommonJS
     module.exports = 'b';
     
-    //or seajs
+    //or cmd
     define(function(require){
         return 'b';
     });

@@ -22,7 +22,7 @@ module.exports = function (option) {
     option.cache = {};
 
     if (option.base) {
-        option.base = path.resolve(option.base, '.') + '\\';
+        option.base = path.resolve(option.base, '.') + '/';
     }
 
     return through.obj(function (file, encoding, cb) {
@@ -202,9 +202,9 @@ function comboContents(option) {
 
         var define = 'define("' + mod.id + '" , ' + deps + ' function(require , exports , module){\n';
 
-        if (!CMD_HEAD_REG.test(code)) {//标准cmd模块
+        if (!CMD_HEAD_REG.test(code)) {//标准commonjs模块
             code = define + code + '\n});';
-        } else {//seajs 模块
+        } else {//cmd 模块
             code = define + code.replace(CMD_HEAD_REG, '');
         }
 
