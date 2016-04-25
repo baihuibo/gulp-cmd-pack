@@ -35,8 +35,8 @@ module.exports = function (option) {
             return cb();
         }
 
-        if (!option.base || !option.mainId) {
-            var opts = !option.base ? '`option.base`' : '`option.mainId`';
+        if (!option.base) {
+            var opts ='`option.base`' ;
             gutil.log(gutil.colors.red(PLUGIN_NAME + ' error: ' + opts + ' is required!'));
             return cb(null, file);
         }
@@ -74,12 +74,13 @@ function getPath(id, option, parentDir) {
 }
 
 var sepReg = /\\/g;
-function getId(path, option) {
-    return path.replace(option.base, '').replace(sepReg, '/').replace('/', '_');
+function getId(filePath, option) {
+    return filePath.replace(option.base, '').replace(sepReg, '/');
 }
 
 //解析模块
 function parseMod(id, option, parentDir) {
+    debugger;
     var ret = getPath(id, option, parentDir);
 
     var isAlias = option.alias[id];
@@ -153,8 +154,8 @@ function readDeps(option, parentDeps) {
 
     var promises = parentDeps.map(function (mod) {
         return new Promise(function (resolve, reject) {
-            
-            if (option.ignore.indexOf(mod.name) > -1) {//忽略的模块
+            debugger;
+            if (option.ignore.indexOf(mod.id) > -1) {//忽略的模块
                 return resolve();
             }
 
@@ -200,7 +201,7 @@ function readDeps(option, parentDeps) {
         });
 }
 
-var CMD_HEAD_REG = /define\(.*function\s*\(\s*require\s*(.*)?\)\s*\{/;
+var CMD_HEAD_REG = /define\(.*function\s*\(\s*(require)*\s*(.*)?\)\s*\{/;
 function comboContents(option) {
     var content = '';
     option.mods.forEach(function (mod) {
@@ -214,12 +215,16 @@ function comboContents(option) {
             deps = '["' + _.pluck(mod.deps, 'id').join('","') + '"],';
         }
 
-        var define = 'define("' + mod.id + '" , ' + deps + ' function(require , exports , module){\n';
-
+        var define = 'define(';
+        //当主模块为空时，设置为匿名模块，以方便自动执行
+        if(mod.id){
+            define+='"' + mod.id + '" ,';
+        }
+        define+=deps + ' function(require , exports , module){\n';
         if (!CMD_HEAD_REG.test(code)) {//标准commonjs模块
             code = define + code + '\n});';
         } else {//cmd 模块
-            code = define + code.replace(CMD_HEAD_REG, '');
+            code = code.replace(CMD_HEAD_REG, define);
         }
 
         content += code + '\n';
