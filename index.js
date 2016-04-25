@@ -80,7 +80,6 @@ function getId(filePath, option) {
 
 //解析模块
 function parseMod(id, option, parentDir) {
-    debugger;
     var ret = getPath(id, option, parentDir);
 
     var isAlias = option.alias[id];
@@ -154,7 +153,7 @@ function readDeps(option, parentDeps) {
 
     var promises = parentDeps.map(function (mod) {
         return new Promise(function (resolve, reject) {
-            debugger;
+            
             if (option.ignore.indexOf(mod.id) > -1) {//忽略的模块
                 return resolve();
             }
