@@ -1,5 +1,8 @@
 /**
  * Created by 惠波 on 2015/7/16.
+ * @edit by leiming on 2016-4-25
+ * <p>1、修正模块引入的js路径相对当于父模块路径</p>
+ * <p>2、对模板中的'字符进行替换（\'）</p>
  */
 var through = require('through2');
 var Promise = require('promise');
@@ -22,7 +25,8 @@ module.exports = function (option) {
     option.cache = {};
 
     if (option.base) {
-        option.base = path.resolve(option.base, '.') + '/';
+        //option.base = path.resolve(option.base, '.') + '/';
+        option.base = path.resolve(option.base, '.') + path.sep
     }
 
     return through.obj(function (file, encoding, cb) {
@@ -50,13 +54,17 @@ module.exports = function (option) {
         return cb(null, file);
     });
 };
-
-function getPath(id, option, absoluteBase) {
+/**
+*@param id {String} 模块id
+*@param  option {Object} 配置对象
+*@param parentDir {String} 父模块基路径
+**/
+function getPath(id, option, parentDir) {
     var ret;
     var first = id.charAt(0);
 
     if (first === ".") {
-        ret = path.resolve(absoluteBase || option.base, id);
+        ret = path.resolve(parentDir || option.base, id);
     } else if (option.alias[id]) {
         ret = path.resolve(option.base, option.alias[id]);
     } else {// Top-level
@@ -71,8 +79,8 @@ function getId(path, option) {
 }
 
 //解析模块
-function parseMod(id, option, absoluteBase) {
-    var ret = getPath(id, option, absoluteBase);
+function parseMod(id, option, parentDir) {
+    var ret = getPath(id, option, parentDir);
 
     var isAlias = option.alias[id];
 
@@ -85,6 +93,7 @@ function parseMod(id, option, absoluteBase) {
 
     ret.id = isAlias ? id : getId(filePath, option);
     ret.filePath = filePath;
+    //ret.dirPath = path.dirname(filePath);
     return ret;
 }
 
@@ -92,7 +101,7 @@ var REQUIRE_RE = /"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\/\*[\S\s]*?\*\/|\/(?:\\\/|[^\
 var SLASH_RE = /\\\\/g;
 
 //解析模块依赖列表
-function parseDependencies(option, code, absoluteBase, mod) {
+function parseDependencies(option, code, mod) {
     var ret = [];
     code.replace(SLASH_RE, "")
         .replace(REQUIRE_RE, function (m, m1, m2) {
@@ -100,7 +109,7 @@ function parseDependencies(option, code, absoluteBase, mod) {
         });
 
     var deps = ret.map(function (modName) {
-        return parseMod(modName, option, absoluteBase);
+        return parseMod(modName, option, mod.dir);
     });
 
     mod.deps = deps;
@@ -119,11 +128,15 @@ function parseTemplate(option, code, mod) {
 
 
 //解析模块树并且读取模块
-function parseContents(option) {
+function parseContents(option,file) {
+    var mainModFilePath = path.resolve(file.base,file.relative);
+    mainModDirPath = path.dirname(mainModFilePath);
     return new Promise(function (done) {
-        var deps = parseDependencies(option, option.content, null, {
+        var deps = parseDependencies(option, option.content, {
             root: true,
-            id: option.mainId
+            id: option.mainId,
+            dir:mainModDirPath,
+            filePath:mainModFilePath
         });
         if (deps.length) {
             done(readDeps(option, deps));
@@ -140,7 +153,8 @@ function readDeps(option, parentDeps) {
 
     var promises = parentDeps.map(function (mod) {
         return new Promise(function (resolve, reject) {
-            if (option.ignore.indexOf(mod.id) > -1) {//忽略的模块
+            
+            if (option.ignore.indexOf(mod.name) > -1) {//忽略的模块
                 return resolve();
             }
 
@@ -161,7 +175,7 @@ function readDeps(option, parentDeps) {
             }
 
             if (mod.ext == '.js') {
-                deps = parseDependencies(option, contents, mod.dir, mod);
+                deps = parseDependencies(option, contents,mod);
                 if (deps.length) {
                     childDeps = childDeps.concat(deps);
                 }
@@ -210,7 +224,6 @@ function comboContents(option) {
 
         content += code + '\n';
     });
-
     return content;
 }
 
@@ -242,9 +255,9 @@ function transform(option, mod, code) {
 
     return code;
 }
-
 function jsEscape(content) {
     return content.replace(/(["\\])/g, "\\$1")
+        .replace(/[\']/g, "\\'")
         .replace(/[\f]/g, "\\f")
         .replace(/[\b]/g, "\\b")
         .replace(/[\n]/g, "\\n")
