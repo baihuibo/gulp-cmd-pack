@@ -3,6 +3,7 @@
  * @edit by leiming on 2016-4-25
  * <p>1、修正模块引入的js路径相对当于父模块路径</p>
  * <p>2、对模板中的'字符进行替换（\'）</p>
+ * <p>修改bug:模块替换时将别名模块进行了替换，导致出错。</p>
  */
 var through = require('through2');
 var Promise = require('promise');
@@ -236,8 +237,9 @@ function transform(option, mod, code) {
 
 
     code.replace(REQUIRE_RE, function (m, m1, m2) {
-
-        if (m2 && option.ignore.indexOf(m2) == -1) {
+    	//m2 即模块名
+    	//条件:模块存在且不在忽略列表里 且 不在别名里   才对模块进行替换
+        if (m2 && option.ignore.indexOf(m2) == -1 && !option.alias[m2]) {
 
             var first = m.charAt(0);
 
