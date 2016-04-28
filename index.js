@@ -3,7 +3,6 @@
  * @edit by leiming on 2016-4-25
  * <p>1、修正模块引入的js路径相对当于父模块路径</p>
  * <p>2、对模板中的'字符进行替换（\'）</p>
- * <p>修改bug:模块替换时将别名模块进行了替换，导致出错。</p>
  */
 var through = require('through2');
 var Promise = require('promise');
@@ -99,13 +98,11 @@ function parseMod(id, option, parentDir) {
 }
 
 var REQUIRE_RE = /"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\/\*[\S\s]*?\*\/|\/(?:\\\/|[^\/\r\n])+\/(?=[^\/])|\/\/.*|\.\s*require|(?:^|[^$])\brequire\s*\(\s*(["'])(.+?)\1\s*\)/g;
-var SLASH_RE = /\\\\/g;
 
 //解析模块依赖列表
 function parseDependencies(option, code, mod) {
     var ret = [];
-    code.replace(SLASH_RE, "")
-        .replace(REQUIRE_RE, function (m, m1, m2) {
+    code.replace(REQUIRE_RE, function (m, m1, m2) {
             m2 && ret.push(m2)
         });
 
@@ -233,8 +230,6 @@ function comboContents(option) {
 }
 
 function transform(option, mod, code) {
-    code = code.replace(SLASH_RE, '');
-
 
     code.replace(REQUIRE_RE, function (m, m1, m2) {
     	//m2 即模块名
