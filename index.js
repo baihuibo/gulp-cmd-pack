@@ -44,8 +44,10 @@ module.exports = function (option) {
         if (file.isBuffer()) {
             option.content = file.contents.toString();
             parseContents(option, file).then(function () {
+            	var jsFilePath = file.base+path.sep+file.relative;
+                jsFilePath = path.normalize(jsFilePath);
                 file.contents = new Buffer(comboContents(option));
-                gutil.log(PLUGIN_NAME + ':', '✔ Module [' + option.mainId + '] combo success.');
+                gutil.log(PLUGIN_NAME + ':', '✔ Module [' + jsFilePath + '] combo success.');
                 cb(null, file);
             });
             return;
@@ -101,6 +103,7 @@ var REQUIRE_RE = /"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\/\*[\S\s]*?\*\/|\/(?:\\\/|[^\
 
 //解析模块依赖列表
 function parseDependencies(option, code, mod) {
+	debugger;
     var ret = [];
     code.replace(REQUIRE_RE, function (m, m1, m2) {
             m2 && ret.push(m2)
@@ -198,7 +201,7 @@ function readDeps(option, parentDeps) {
         });
 }
 
-var CMD_HEAD_REG = /define\(.*function\s*\(\s*(require)*\s*(.*)?\)\s*\{/;
+var CMD_HEAD_REG = /define\(.*?function\s*\(.*?\)\s*\{/;
 function comboContents(option) {
     var content = '';
     option.mods.forEach(function (mod) {
@@ -217,9 +220,9 @@ function comboContents(option) {
         if(mod.id){
             define+='"' + mod.id + '" ,';
         }
-        define+=deps + ' function(require , exports , module){\n';
+        define+=deps + ' function(require , exports , module){';
         if (!CMD_HEAD_REG.test(code)) {//标准commonjs模块
-            code = define + code + '\n});';
+            code = define+'\n' + code + '\n});';
         } else {//cmd 模块
             code = code.replace(CMD_HEAD_REG, define);
         }
