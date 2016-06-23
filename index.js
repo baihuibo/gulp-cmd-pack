@@ -11,7 +11,7 @@ var fs = require('fs');
 var gutil = require('gulp-util');
 var _ = require('underscore');
 
-var PLUGIN_NAME = 'gulp-cmd-wrap';
+var PLUGIN_NAME = 'gulp-cmd-pack';
 
 module.exports = function (option) {
 
@@ -25,8 +25,7 @@ module.exports = function (option) {
     option.cache = {};
 
     if (option.base) {
-        //option.base = path.resolve(option.base, '.') + '/';
-        option.base = path.resolve(option.base, '.') + path.sep
+        option.base = path.normalize(path.resolve(option.base, '.') + path.sep);
     }
 
     return through.obj(function (file, encoding, cb) {
@@ -36,15 +35,14 @@ module.exports = function (option) {
         }
 
         if (!option.base) {
-            var opts ='`option.base`' ;
-            gutil.log(gutil.colors.red(PLUGIN_NAME + ' error: ' + opts + ' is required!'));
+            gutil.log(gutil.colors.red(PLUGIN_NAME + ' error: `option.base` is required!'));
             return cb(null, file);
         }
 
         if (file.isBuffer()) {
             option.content = file.contents.toString();
             parseContents(option, file).then(function () {
-            	var jsFilePath = file.base+path.sep+file.relative;
+                var jsFilePath = file.base + path.sep + file.relative;
                 jsFilePath = path.normalize(jsFilePath);
                 file.contents = new Buffer(comboContents(option));
                 gutil.log(PLUGIN_NAME + ':', '✔ Module [' + jsFilePath + '] combo success.');
@@ -57,10 +55,10 @@ module.exports = function (option) {
     });
 };
 /**
-*@param id {String} 模块id
-*@param  option {Object} 配置对象
-*@param parentDir {String} 父模块基路径
-**/
+ *@param id {String} 模块id
+ *@param option {Object} 配置对象
+ *@param parentDir {String} 父模块基路径
+ **/
 function getPath(id, option, parentDir) {
     var ret;
     var first = id.charAt(0);
@@ -99,19 +97,26 @@ function parseMod(id, option, parentDir) {
     return ret;
 }
 
-var REQUIRE_RE = /"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\/\*[\S\s]*?\*\/|\/(?:\\\/|[^\/\r\n])+\/(?=[^\/])|\/\/.*|\.\s*require|(?:^|[^$])\brequire\s*\(\s*(["'])(.+?)\1\s*\)/g;
+/**
+ * 修复匹配 `require('mod')` 时,多匹配一个字符的bug
+ * 如: var name=require('./mod');
+ * 之前匹配: `=require('./mod')`;
+ * 修改之后: `require('./mod')`;
+ * @type {RegExp}
+ */
+var REQUIRE_RE = /"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\/\*[\S\s]*?\*\/|\/(?:\\\/|[^\/\r\n])+\/(?=[^\/])|\/\/.*|\w+require\(.*\)|require\s*\(\s*(["'])(.+?)\1\s*\)/g;
 
 //解析模块依赖列表
 function parseDependencies(option, code, mod) {
-	debugger;
     var ret = [];
-    code.replace(REQUIRE_RE, function (m, m1, m2) {
-            m2 && ret.push(m2)
-        });
-
-    var deps = ret.map(function (modName) {
-        return parseMod(modName, option, mod.dir);
+    code.replace(REQUIRE_RE, function (m, m1, moduleId) {
+        moduleId && ret.push(moduleId)
     });
+
+    // 这里去重用来修复可能出现的重复引用模块,避免不必要的计算
+    var deps = _.chain(ret).uniq().map(function (moduleId) {
+        return parseMod(moduleId, option, mod.dir);
+    }).value();
 
     mod.deps = deps;
     mod.code = code;
@@ -129,15 +134,15 @@ function parseTemplate(option, code, mod) {
 
 
 //解析模块树并且读取模块
-function parseContents(option,file) {
-    var mainModFilePath = path.resolve(file.base,file.relative);
+function parseContents(option, file) {
+    var mainModFilePath = path.resolve(file.base, file.relative);
     mainModDirPath = path.dirname(mainModFilePath);
     return new Promise(function (done) {
         var deps = parseDependencies(option, option.content, {
             root: true,
             id: option.mainId,
-            dir:mainModDirPath,
-            filePath:mainModFilePath
+            dir: mainModDirPath,
+            filePath: mainModFilePath
         });
         if (deps.length) {
             done(readDeps(option, deps));
@@ -154,7 +159,7 @@ function readDeps(option, parentDeps) {
 
     var promises = parentDeps.map(function (mod) {
         return new Promise(function (resolve, reject) {
-            
+
             if (option.ignore.indexOf(mod.id) > -1) {//忽略的模块
                 return resolve();
             }
@@ -176,7 +181,7 @@ function readDeps(option, parentDeps) {
             }
 
             if (mod.ext == '.js') {
-                deps = parseDependencies(option, contents,mod);
+                deps = parseDependencies(option, contents, mod);
                 if (deps.length) {
                     childDeps = childDeps.concat(deps);
                 }
@@ -217,12 +222,12 @@ function comboContents(option) {
 
         var define = 'define(';
         //当主模块为空时，设置为匿名模块，以方便自动执行
-        if(mod.id){
-            define+='"' + mod.id + '" ,';
+        if (mod.id) {
+            define += '"' + mod.id + '" ,';
         }
-        define+=deps + ' function(require , exports , module){';
+        define += deps + ' function(require , exports , module){';
         if (!CMD_HEAD_REG.test(code)) {//标准commonjs模块
-            code = define+'\n' + code + '\n});';
+            code = define + '\n' + code + '\n});';
         } else {//cmd 模块
             code = code.replace(CMD_HEAD_REG, define);
         }
@@ -233,40 +238,28 @@ function comboContents(option) {
 }
 
 function transform(option, mod, code) {
-
-    code.replace(REQUIRE_RE, function (m, m1, m2) {
-    	//m2 即模块名
-    	//条件:模块存在且不在忽略列表里 且 不在别名里   才对模块进行替换
-        if (m2 && option.ignore.indexOf(m2) == -1 && !option.alias[m2]) {
-
-            var first = m.charAt(0);
-
-            var newId = getId(getPath(m2, option, mod.dir), option);
+    code.replace(REQUIRE_RE, function (code_ref, m1, moduleId) {
+        /**
+         * code_ref 正则所匹配到的代码如 `require('./mod')`
+         * moduleId 匹配到的模块路径或者id `./mod`
+         */
+        //条件:模块存在且不在忽略列表里 且 不在别名里 才对模块进行替换
+        if (moduleId && option.ignore.indexOf(moduleId) == -1 && !option.alias[moduleId]) {
+            var newId = getId(getPath(moduleId, option, mod.dir), option);
 
             if (!path.extname(newId)) {
                 newId += '.js';
             }
 
             newId = 'require("' + newId + '")';
-
-            if (first === '(') {
-                newId = '(' + newId;
-            }
-
-            code = code.replace(m, newId);
+            code = code.replace(code_ref, newId);
         }
     });
 
     return code;
 }
 function jsEscape(content) {
-    return content.replace(/(["\\])/g, "\\$1")
-        .replace(/[\']/g, "\\'")
-        .replace(/[\f]/g, "\\f")
-        .replace(/[\b]/g, "\\b")
-        .replace(/[\n]/g, "\\n")
-        .replace(/[\t]/g, "\\t")
-        .replace(/[\r]/g, "\\r")
-        .replace(/[\u2028]/g, "\\u2028")
-        .replace(/[\u2029]/g, "\\u2029")
+    //替换符号 u2028 u2029 \f \b \t \r ' " \
+    return content.replace(/([\u2029\u2028\f\b\t\r'"\\])/g, "\\$1")
+        .replace(/\n/g, ' ');// 这里替换换行符为空格
 }
