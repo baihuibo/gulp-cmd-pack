@@ -1,6 +1,6 @@
 {
   "name": "gulp-cmd-pack",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "seajs的cmd模块合并打包工具",
   "main": "index.js",
   "scripts": {
