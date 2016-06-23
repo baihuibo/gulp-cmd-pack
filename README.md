@@ -21,8 +21,8 @@ gulp.task('cmd', function () {
             mainId: 'app', //初始化模块的id
             base: 'path/to/module/', //base路径
             alias: {
-                dialog: '../../bower_components/art-dialog/dist/dialog-plus-min.js',
-                customScrollBar: '../../bower_components/malihu-custom-scrollbar-plugin/jquery.mCustomScrollbar.min.js'
+                dialog: '../bower_components/dialog/dialog.js',
+                jquery: '../bower_components/jquery/dist/jquery.min.js'
             },
             ignore: ['bootstrap'] //这里的模块将不会打包进去
         }))
