@@ -83,8 +83,9 @@ function parseMod(id, option, parentDir) {
     var ret = getPath(id, option, parentDir);
 
     var isAlias = option.alias[id];
+    var ext = path.extname(ret);
 
-    if (!path.extname(ret)) {
+    if (!ext || ext == '.min') {// 用来支持 xxx.min.js 模块引用
         ret += '.js';
     }
 
