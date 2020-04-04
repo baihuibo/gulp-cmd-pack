@@ -1,0 +1,3 @@
+function tset() {
+    Object();
+}

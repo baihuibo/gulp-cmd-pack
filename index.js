@@ -54,6 +54,7 @@ module.exports = function (option) {
         return cb(null, file);
     });
 };
+
 /**
  *@param id {String} 模块id
  *@param option {Object} 配置对象
@@ -70,32 +71,40 @@ function getPath(id, option, parentDir) {
     } else {// Top-level
         ret = (option.base + id);
     }
-    return path.normalize(ret);
+    ret = path.normalize(ret);
+    return getRealPath(ret);
+}
+
+// 有时候获取到的路径并不能对应到真正的文件，这里通过循环后缀名匹配尝试找到真实存在的文件地址
+var exts = ['.js', '.min.js', '.json'];
+
+function getRealPath(uri) {
+    var ext = '';
+    var index = 0;
+    do {
+        var realUri = uri + ext;
+        if (fs.existsSync(realUri)) {
+            return realUri;
+        }
+    } while ((ext = exts[index++]));
+    return uri;
 }
 
 var sepReg = /\\/g;
+
 function getId(filePath, option) {
     return filePath.replace(option.base, '').replace(sepReg, '/');
 }
 
 //解析模块
 function parseMod(id, option, parentDir) {
-    var ret = getPath(id, option, parentDir);
+    var filePath = getPath(id, option, parentDir);
+    var mod = path.parse(filePath);
 
-    var isAlias = option.alias[id];
-    var ext = path.extname(ret);
+    mod.id = option.alias[id] ? id : getId(filePath, option);
+    mod.filePath = filePath;
 
-    if (!ext || ext == '.min') {// 用来支持 xxx.min.js 模块引用
-        ret += '.js';
-    }
-
-    var filePath = ret;
-    ret = path.parse(ret);
-
-    ret.id = isAlias ? id : getId(filePath, option);
-    ret.filePath = filePath;
-    //ret.dirPath = path.dirname(filePath);
-    return ret;
+    return mod;
 }
 
 /**
@@ -133,11 +142,17 @@ function parseTemplate(option, code, mod) {
     option.mods.push(mod);
 }
 
+//模板模块处理
+function parseJson(option, code, mod) {
+    mod.code = 'module.exports = ' + code + ';';
+    mod.deps = [];
+    option.mods.push(mod);
+}
 
 //解析模块树并且读取模块
 function parseContents(option, file) {
     var mainModFilePath = path.resolve(file.base, file.relative);
-    mainModDirPath = path.dirname(mainModFilePath);
+    var mainModDirPath = path.dirname(mainModFilePath);
     return new Promise(function (done) {
         var deps = parseDependencies(option, option.content, {
             root: true,
@@ -170,7 +185,7 @@ function readDeps(option, parentDeps) {
             }
 
             var contents, deps;
-            if (mod.ext === '.js' || option.tmpExtNames.indexOf(mod.ext) > -1) {
+            if (/\.(js|json)/.test(mod.ext) || option.tmpExtNames.indexOf(mod.ext) > -1) {
                 try {
                     contents = fs.readFileSync(mod.filePath, option.encoding);
                 } catch (_) {
@@ -181,13 +196,15 @@ function readDeps(option, parentDeps) {
                 option.cache[mod.filePath] = true;
             }
 
-            if (mod.ext == '.js') {
+            if (mod.ext === '.js') {
                 deps = parseDependencies(option, contents, mod);
                 if (deps.length) {
                     childDeps = childDeps.concat(deps);
                 }
             } else if (option.tmpExtNames.indexOf(mod.ext) > -1) {//插件支持
                 parseTemplate(option, contents, mod);
+            } else if (mod.ext === '.json') {//json支持
+                parseJson(option, contents, mod);
             }
 
             resolve();
@@ -207,7 +224,7 @@ function readDeps(option, parentDeps) {
         });
 }
 
-var CMD_HEAD_REG = /define\(.*?function\s*\(.*?\)\s*\{/;
+var CMD_HEAD_REG = /define\(.*?function\s*\(.*?\)\s*{/; // 处理默认 commonJs、 amd
 function comboContents(option) {
     var content = '';
     option.mods.forEach(function (mod) {
@@ -216,21 +233,21 @@ function comboContents(option) {
         //替换模块内部id
         code = transform(option, mod, code);
 
-        var deps = '[],';
-        if (mod.deps.length) {
-            deps = '["' + _.pluck(mod.deps, 'id').join('","') + '"],';
-        }
-
         var define = 'define(';
         //当主模块为空时，设置为匿名模块，以方便自动执行
         if (mod.id) {
             define += '"' + mod.id + '" ,';
         }
+        var deps = '[],';
+        if (mod.deps.length) {
+            deps = '["' + _.pluck(mod.deps, 'id').join('","') + '"],';
+        }
+
         define += deps + ' function(require , exports , module){';
-        if (!CMD_HEAD_REG.test(code)) {//标准commonjs模块
-            code = define + '\n' + code + '\n});';
-        } else {//cmd 模块
+        if (CMD_HEAD_REG.test(code)) { // 处理可识别的 commonjs 、cmd、amd 模块
             code = code.replace(CMD_HEAD_REG, define);
+        } else { // 其它 umd、普通全局js等统一包装到 define
+            code = define + '\n' + code + '\n});';
         }
 
         content += code + '\n';
@@ -245,20 +262,15 @@ function transform(option, mod, code) {
          * moduleId 匹配到的模块路径或者id `./mod`
          */
         //条件:模块存在且不在忽略列表里 且 不在别名里 才对模块进行替换
-        if (moduleId && option.ignore.indexOf(moduleId) == -1 && !option.alias[moduleId]) {
-            var newId = getId(getPath(moduleId, option, mod.dir), option);
-
-            if (!path.extname(newId)) {
-                newId += '.js';
-            }
-
-            newId = 'require("' + newId + '")';
-            code = code.replace(code_ref, newId);
+        if (moduleId && option.ignore.indexOf(moduleId) === -1 && !option.alias[moduleId]) {
+            var newFileId = getId(getPath(moduleId, option, mod.dir), option);
+            code = code.replace(code_ref, 'require("' + newFileId + '")');
         }
     });
 
     return code;
 }
+
 function jsEscape(content) {
     //替换符号 u2028 u2029 \f \b \t \r ' " \
     return content.replace(/([\u2029\u2028\f\b\t\r'"\\])/g, "\\$1")

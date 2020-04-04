@@ -1,6 +1,6 @@
 {
   "name": "gulp-cmd-pack",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "seajs的cmd模块合并打包工具",
   "main": "index.js",
   "scripts": {
@@ -29,5 +29,8 @@
     "promise": "^6.1.0",
     "underscore": "^1.8.3"
   },
-  "readmeFilename": "README.md"
+  "readmeFilename": "README.md",
+  "devDependencies": {
+    "gulp": "^4.0.2"
+  }
 }
